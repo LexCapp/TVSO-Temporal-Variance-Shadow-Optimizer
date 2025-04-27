@@ -117,5 +117,5 @@ TVSO isn't just about "better shadows." It's about smarter shadows.
 
 Smoother. Faster. Sharper. Adaptive. Tasty. Shadows
 
-Powered by variance, protected by Sunny.
+Powered by variance.
 
