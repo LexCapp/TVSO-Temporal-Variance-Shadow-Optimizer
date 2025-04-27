@@ -1,0 +1,52 @@
+// VarianceComputeURP.compute
+#pragma kernel CS_VarianceURP
+#include "UnityCG.cginc"
+
+// URP packs cascades into a single 2D atlas (quad layout).
+Texture2D<float>   _MainLightShadowmapTexture;
+RWTexture2D<float4> _VarianceOut;
+int                 _SampleCount;
+
+[numthreads(1,1,1)]
+void CS_VarianceURP(uint3 id : SV_DispatchThreadID)
+{
+    uint width, height;
+    _MainLightShadowmapTexture.GetDimensions(width, height);
+
+    // Each cascade is in one quadrant: 2×2 grid
+    uint quadW = width  / 2;
+    uint quadH = height / 2;
+
+    float4 variances = float4(0,0,0,0);
+
+    for (uint c = 0; c < 4; ++c)
+    {
+        // quadrant origin
+        uint baseX = (c % 2) * quadW;
+        uint baseY = (c / 2) * quadH;
+
+        float mean = 0;
+        float meanSq = 0;
+
+        for (uint s = 0; s < _SampleCount; ++s)
+        {
+            uint seed = c * 0x9E3779B9u + s * 0x85EBCA6Bu;
+            float u = frac(sin((float)seed) * 43758.5453123);
+            float v = frac(cos((float)(seed + 1u)) * 96331.1571);
+
+            uint x = baseX + (uint)(u * (quadW - 1));
+            uint y = baseY + (uint)(v * (quadH - 1));
+
+            float d = _MainLightShadowmapTexture.Load(int3(x, y, 0), 0);
+            mean   += d;
+            meanSq += d * d;
+        }
+
+        mean   /= _SampleCount;
+        meanSq /= _SampleCount;
+        variances[c] = max(meanSq - mean * mean, 0);
+    }
+
+    // Write our 4 cascades’ variance into the single pixel at (0,0)
+    _VarianceOut[int2(0,0)] = variances;
+}
